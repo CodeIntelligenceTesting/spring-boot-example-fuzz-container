@@ -50,26 +50,15 @@ jobs:
           version: 'latest'
       - id: run-fuzz-tests
         name: Run Fuzz Tests
-        env:
-          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
-        run: |
-          # Login to CI Sense
-          echo "${{ secrets.CI_SENSE_API_TOKEN }}" | cifuzz login --server "${CI_SENSE_URL}"
-
-          # Tell cmake where to find the cifuzz cmake functions.
-          export cifuzz_DIR="$GITHUB_WORKSPACE/$CI_FUZZ_INSTALL_DIR/share/cmake"
-
-          cd $CHECKOUT_DIR/
-          # Start remote run using fuzz containers and wait $TIMEOUT for findings.
-          cifuzz container remote-run com.example.app.GreetEndpointTests::fuzzTestGreet \
-            --monitor \
-            --monitor-duration="${TIMEOUT}" \
-            --min-finding-severity="${MIN_FINDINGS_SEVERITY}" \
-            --project="${PROJECT}" \
-            --server="${CI_SENSE_URL}" \
-            --branch="${BRANCH_NAME}" \
-            -v
-        shell: "bash"
+        uses: CodeIntelligenceTesting/github-actions/run-fuzz-tests@v6
+        with:
+          ci_sense_api_token: ${{ secrets.CI_SENSE_API_TOKEN }}
+          project_name: ${{ env.PROJECT }}
+          repository_dir: ${{ env.CHECKOUT_DIR }}
+          timeout: ${{ env.TIMEOUT }}
+          min_findings_severity: ${{ env.MIN_FINDINGS_SEVERITY }}
+          ci_sense_url: ${{ env.CI_SENSE_URL }}
+          fuzz_tests: "com.example.app.GreetEndpointTests::fuzzTestGreet"
       - id: save-results
         name: Save Fuzz Test Results
         uses: CodeIntelligenceTesting/github-actions/save-results@v5
