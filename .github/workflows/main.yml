@@ -2,6 +2,9 @@ name: CI Fuzz
 # Set a CI/CD variable called "CI_SENSE_API_TOKEN" with an API token
 # generated in CI Fuzz web interface and a variable called "CI_FUZZ_DOWNLOAD_TOKEN"
 # with a download token from https://downloads.code-intelligence.com.
+# To download the CI Fuzz maven extension or gradle plugin set the secrets
+# MAVEN_REGISTRY_USERNAME and MAVEN_REGISTRY_PASSWORD with the credentials
+# from https://downloads.code-intelligence.com.
 
 on:
   workflow_dispatch:
@@ -20,12 +23,12 @@ env:
   # Possible values: 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
   MIN_FINDINGS_SEVERITY: MEDIUM
   # The CI Sense URL.
-  CI_SENSE_URL: https://app.staging.code-intelligence.com
+  CI_SENSE_HTTP_URL: https://app.staging.code-intelligence.com
+  CI_SENSE_GRPC_URL: grpc.staging.code-intelligence.com:443
   # The CI Sense project name.
-  PROJECT: prj-NOdgyF6GBeOE
+  PROJECT: prj-tSg6cwlCgIil
   # Directory in which the repository will be cloned.
   CHECKOUT_DIR: checkout-dir/
-  CI_FUZZ_DOWNLOAD_URL: "https://downloads.code-intelligence.com/download/cifuzz/linux_amd64/latest?token=${{ secrets.CI_FUZZ_DOWNLOAD_TOKEN }}"
 jobs:
   fuzz_tests:
     runs-on: ubuntu-latest
@@ -41,7 +44,7 @@ jobs:
           distribution: 'temurin'
       - uses: s4u/maven-settings-action@v2.8.0
         with:
-          servers: '[{"id": "code-intelligence", "username": "Code-Intelligence-Internal", "password": "${{ secrets.MAVEN_REGISTRY_PASSWORD }}"}]'
+          servers: '[{"id": "code-intelligence", "username": "${{ secrets.MAVEN_REGISTRY_USERNAME }}", "password": "${{ secrets.MAVEN_REGISTRY_PASSWORD }}"}]'
       - id: install-cifuzz
         name: Install cifuzz
         uses: CodeIntelligenceTesting/github-actions/install-cifuzz@v6
@@ -57,16 +60,18 @@ jobs:
           repository_dir: ${{ env.CHECKOUT_DIR }}
           timeout: ${{ env.TIMEOUT }}
           min_findings_severity: ${{ env.MIN_FINDINGS_SEVERITY }}
-          ci_sense_url: ${{ env.CI_SENSE_URL }}
+          ci_sense_http_url: ${{ env.CI_SENSE_HTTP_URL }}
           fuzz_tests: "com.example.app.GreetEndpointTests::fuzzTestGreet"
       - id: save-results
         name: Save Fuzz Test Results
-        uses: CodeIntelligenceTesting/github-actions/save-results@v5
+        uses: CodeIntelligenceTesting/github-actions/save-results@v6
         if: ${{ success() || failure() }}
         with:
-          ci_fuzz_api_token: ${{ secrets.CI_SENSE_API_TOKEN }}
-          test_collection_run: ${{ steps.start-fuzzing.outputs.test_collection_run }}
-          dashboard_address: ${{ env.CI_SENSE_URL }}
+          ci_sense_api_token: ${{ secrets.CI_SENSE_API_TOKEN }}
+          ci_sense_http_url: ${{ env.CI_SENSE_HTTP_URL }}
+          ci_sense_grpc_url: ${{ env.CI_SENSE_GRPC_URL }}
+          project_name: ${{ env.PROJECT }}
+          started_run: ${{ steps.run-fuzz-tests.outputs.started_run }}
       - id: upload-artifact
         uses: actions/upload-artifact@v2
         if: ${{ (success() || failure()) }}
