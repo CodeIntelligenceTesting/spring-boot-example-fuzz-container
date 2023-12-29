@@ -26,7 +26,6 @@ env:
   # Directory in which the repository will be cloned.
   CHECKOUT_DIR: checkout-dir/
   CI_FUZZ_DOWNLOAD_URL: "https://downloads.code-intelligence.com/download/cifuzz/linux_amd64/latest?token=${{ secrets.CI_FUZZ_DOWNLOAD_TOKEN }}"
-  CI_FUZZ_INSTALL_DIR: ./cifuzz
 jobs:
   fuzz_tests:
     runs-on: ubuntu-latest
@@ -45,25 +44,24 @@ jobs:
           servers: '[{"id": "code-intelligence", "username": "Code-Intelligence-Internal", "password": "${{ secrets.MAVEN_REGISTRY_PASSWORD }}"}]'
       - id: install-cifuzz
         name: Install cifuzz
-        run: |
-          curl --fail --silent --show-error --location -o cifuzz_installer "$CI_FUZZ_DOWNLOAD_URL"
-          chmod u+x cifuzz_installer
-          ./cifuzz_installer --install-dir $CI_FUZZ_INSTALL_DIR
+        uses: CodeIntelligenceTesting/github-actions/install-cifuzz@v6
+        with:
+          download_token: ${{ secrets.CI_FUZZ_DOWNLOAD_TOKEN }}
+          version: 'latest'
       - id: run-fuzz-tests
         name: Run Fuzz Tests
         env:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         run: |
-          export CI_FUZZ="$GITHUB_WORKSPACE/$CI_FUZZ_INSTALL_DIR/bin/cifuzz"
           # Login to CI Sense
-          echo "${{ secrets.CI_SENSE_API_TOKEN }}" | ${CI_FUZZ} login --server "${CI_SENSE_URL}"
+          echo "${{ secrets.CI_SENSE_API_TOKEN }}" | cifuzz login --server "${CI_SENSE_URL}"
 
           # Tell cmake where to find the cifuzz cmake functions.
           export cifuzz_DIR="$GITHUB_WORKSPACE/$CI_FUZZ_INSTALL_DIR/share/cmake"
 
           cd $CHECKOUT_DIR/
           # Start remote run using fuzz containers and wait $TIMEOUT for findings.
-          ${CI_FUZZ} container remote-run com.example.app.GreetEndpointTests::fuzzTestGreet \
+          cifuzz container remote-run com.example.app.GreetEndpointTests::fuzzTestGreet \
             --monitor \
             --monitor-duration="${TIMEOUT}" \
             --min-finding-severity="${MIN_FINDINGS_SEVERITY}" \
